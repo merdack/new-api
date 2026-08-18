@@ -97,22 +97,23 @@ func iranianProviderOrder(requested string) ([]string, error) {
 		}
 		return []string{requested}, nil
 	}
+
 	first := normalizedIranianDefault()
 	second := model.PaymentProviderZibal
 	if first == second {
 		second = model.PaymentProviderZarinpal
 	}
-	providers := make([]string, 0, 2)
-	for _, provider := range []string{first, second} {
-		if isIranianGatewayEnabled(provider) {
-			providers = append(providers, provider)
+
+	if !isIranianGatewayEnabled(first) {
+		if !setting.IranianPaymentAutoFailover || !isIranianGatewayEnabled(second) {
+			return nil, fmt.Errorf("payment gateway is not configured")
 		}
+		return []string{second}, nil
 	}
-	if len(providers) == 0 {
-		return nil, fmt.Errorf("payment gateway is not configured")
-	}
-	if !setting.IranianPaymentAutoFailover && len(providers) > 1 {
-		providers = providers[:1]
+
+	providers := []string{first}
+	if setting.IranianPaymentAutoFailover && isIranianGatewayEnabled(second) {
+		providers = append(providers, second)
 	}
 	return providers, nil
 }

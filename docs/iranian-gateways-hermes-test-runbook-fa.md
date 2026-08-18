@@ -57,7 +57,7 @@ Secretها را بدون نمایش مقدار تنظیم کن:
 ```bash
 export NEW_API_BASE_URL='https://YOUR-STAGING-DOMAIN'
 export NEW_API_CALLBACK_URL='https://YOUR-STAGING-DOMAIN'
-export NEW_API_ROOT_COOKIE='SESSION_COOKIE_FROM_STAGING'
+export NEW_API_ROOT_ACCESS_TOKEN='ROOT_ACCESS_TOKEN_FROM_STAGING'
 export NEW_API_USER_COOKIE='TEST_USER_SESSION_COOKIE'
 export ZARINPAL_SANDBOX_MERCHANT='SANDBOX_MERCHANT_ID'
 export TEST_TOPUP_USD='1'
@@ -70,7 +70,7 @@ export TEST_MARGIN_BPS='1000'
 ```bash
 test -n "$NEW_API_BASE_URL"
 test -n "$NEW_API_CALLBACK_URL"
-test -n "$NEW_API_ROOT_COOKIE"
+test -n "$NEW_API_ROOT_ACCESS_TOKEN"
 test -n "$NEW_API_USER_COOKIE"
 test -n "$ZARINPAL_SANDBOX_MERCHANT"
 ```
@@ -133,7 +133,7 @@ curl --fail --silent --show-error \
   > "$ARTIFACT_DIR/preflight.json"
 ```
 
-تابع زیر تنظیمات را با session Root به API می‌فرستد. نام واقعی Cookie نباید در فایل گزارش ثبت شود:
+تابع زیر تنظیمات را با access token کاربر Root به API می‌فرستد. Cookie مربوط به refresh به مسیر `/api/user/auth` محدود است و برای `/api/option/` قابل استفاده نیست. نام واقعی Cookie نباید در فایل گزارش ثبت شود:
 
 ```bash
 set_option() {
@@ -142,19 +142,19 @@ set_option() {
   curl --fail --silent --show-error \
     -X PUT "$NEW_API_BASE_URL/api/option/" \
     -H 'Content-Type: application/json' \
-    -H "Cookie: $NEW_API_ROOT_COOKIE" \
+    -H "Authorization: Bearer $NEW_API_ROOT_ACCESS_TOKEN" \
     --data "$(jq -nc --arg key "$key" --arg value "$value" '{key:$key,value:$value}')" \
     | jq -e '.success == true' >/dev/null
 }
 ```
 
-ابتدا compliance را با session داشبورد تأیید کن:
+ابتدا compliance را با access token کاربر Root تأیید کن:
 
 ```bash
 curl --fail --silent --show-error \
   -X POST "$NEW_API_BASE_URL/api/option/payment_compliance" \
   -H 'Content-Type: application/json' \
-  -H "Cookie: $NEW_API_ROOT_COOKIE" \
+  -H "Authorization: Bearer $NEW_API_ROOT_ACCESS_TOKEN" \
   --data '{"confirmed":true}' \
   | jq -e '.success == true' >/dev/null
 ```

@@ -26,3 +26,68 @@ func TestZarinpalQuoteSnapshotsRateAndMargin(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expectedQuota, quota)
 }
+
+func configureIranianProviderOrderTest(t *testing.T) {
+	t.Helper()
+	confirmPaymentComplianceForTest(t)
+	oldDefault := setting.IranianPaymentDefault
+	oldFailover := setting.IranianPaymentAutoFailover
+	oldZarinpalMerchant := setting.ZarinpalMerchantID
+	oldZibalMerchant := setting.ZibalMerchant
+	oldRate := setting.ZarinpalIRRPerUSD
+	oldMargin := setting.ZarinpalMarginBPS
+	t.Cleanup(func() {
+		setting.IranianPaymentDefault = oldDefault
+		setting.IranianPaymentAutoFailover = oldFailover
+		setting.ZarinpalMerchantID = oldZarinpalMerchant
+		setting.ZibalMerchant = oldZibalMerchant
+		setting.ZarinpalIRRPerUSD = oldRate
+		setting.ZarinpalMarginBPS = oldMargin
+	})
+	setting.IranianPaymentDefault = "zarinpal"
+	setting.ZarinpalMerchantID = ""
+	setting.ZibalMerchant = "zibal"
+	setting.ZarinpalIRRPerUSD = 1_000_000
+	setting.ZarinpalMarginBPS = 1000
+}
+
+func TestIranianProviderOrderFailoverDisabledDoesNotSubstituteDefault(t *testing.T) {
+	configureIranianProviderOrderTest(t)
+	setting.IranianPaymentAutoFailover = false
+
+	providers, err := iranianProviderOrder("")
+
+	require.Error(t, err)
+	assert.Nil(t, providers)
+}
+
+func TestIranianProviderOrderFailoverEnabledUsesConfiguredBackup(t *testing.T) {
+	configureIranianProviderOrderTest(t)
+	setting.IranianPaymentAutoFailover = true
+
+	providers, err := iranianProviderOrder("")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"zibal"}, providers)
+}
+
+func TestIranianProviderOrderExplicitUnavailableProviderNeverFallsBack(t *testing.T) {
+	configureIranianProviderOrderTest(t)
+	setting.IranianPaymentAutoFailover = true
+
+	providers, err := iranianProviderOrder("zarinpal")
+
+	require.Error(t, err)
+	assert.Nil(t, providers)
+}
+
+func TestIranianProviderOrderExplicitConfiguredProviderSucceeds(t *testing.T) {
+	configureIranianProviderOrderTest(t)
+	setting.IranianPaymentAutoFailover = false
+
+	providers, err := iranianProviderOrder("zibal")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"zibal"}, providers)
+}
+
