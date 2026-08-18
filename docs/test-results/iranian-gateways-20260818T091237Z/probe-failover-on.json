@@ -1,0 +1,10 @@
+{
+  "data": {
+    "amount_irr": 1100000,
+    "currency": "IRR",
+    "pay_link": "https://gateway.zibal.ir/start/<REDACTED>",
+    "provider": "zibal"
+  },
+  "message": "",
+  "success": true
+}

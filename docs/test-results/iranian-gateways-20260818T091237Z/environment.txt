@@ -1,7 +1,7 @@
 # Hermes environment snapshot (secrets redacted)
 UTC_TIMESTAMP=2026-08-18T09:12:37Z
 GIT_BRANCH=agent/iranian-fiat-billing
-GIT_COMMIT=d33713e93d8afe14be4ffc486213dee6ceb445a4
+GIT_COMMIT=73e36a7c8553964ac620b9070f8cfe8e57d48637
 NEW_API_BASE_URL=https://antseed.ir
 NEW_API_CALLBACK_URL=https://antseed.ir
 ZARINPAL_SANDBOX_MERCHANT=UNSET-BLOCKED
