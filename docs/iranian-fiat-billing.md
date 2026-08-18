@@ -2,6 +2,8 @@
 
 This integration adds Zarinpal and Zibal as IRR top-up providers while keeping New API's quota ledger as the customer balance source of truth. AntSeed remains an upstream channel and never receives customer payment details.
 
+For staging verification and the required evidence bundle, follow the [Persian Hermes test runbook](./iranian-gateways-hermes-test-runbook-fa.md).
+
 ## Configuration
 
 | Option | Meaning |
