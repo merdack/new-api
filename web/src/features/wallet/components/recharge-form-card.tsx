@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -39,10 +39,12 @@ import { cn } from '@/lib/utils'
 
 import {
   formatCurrency,
+  formatPaymentAmount,
   getDiscountLabel,
   getPaymentIcon,
   getMinTopupAmount,
   calculatePresetPricing,
+  getIranianPaymentMethods,
 } from '../lib'
 import type {
   PaymentMethod,
@@ -62,6 +64,7 @@ interface RechargeFormCardProps {
   onTopupAmountChange: (amount: number) => void
   paymentAmount: number
   calculating: boolean
+  paymentCurrency?: string
   onPaymentMethodSelect: (method: PaymentMethod) => void
   paymentLoading: string | null
   redemptionCode: string
@@ -92,6 +95,7 @@ export function RechargeFormCard({
   onTopupAmountChange,
   paymentAmount,
   calculating,
+  paymentCurrency,
   onPaymentMethodSelect,
   paymentLoading,
   redemptionCode,
@@ -134,10 +138,17 @@ export function RechargeFormCard({
     topupInfo?.enable_online_topup ||
     topupInfo?.enable_stripe_topup ||
     enableWaffoTopup ||
-    enableWaffoPancakeTopup
+    enableWaffoPancakeTopup ||
+    topupInfo?.enable_zarinpal_topup ||
+    topupInfo?.enable_zibal_topup
   const hasAnyTopup = hasConfigurableTopup || enableCreemTopup
-  const hasStandardPaymentMethods =
-    Array.isArray(topupInfo?.pay_methods) && topupInfo.pay_methods.length > 0
+  const standardPaymentMethods = useMemo(() => {
+    return [
+      ...(topupInfo?.pay_methods || []),
+      ...getIranianPaymentMethods(topupInfo),
+    ]
+  }, [topupInfo])
+  const hasStandardPaymentMethods = standardPaymentMethods.length > 0
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
@@ -306,7 +317,7 @@ export function RechargeFormCard({
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {formatPaymentAmount(paymentAmount, paymentCurrency)}
                       </span>
                     )}
                   </div>
@@ -319,7 +330,7 @@ export function RechargeFormCard({
                 </Label>
                 {hasStandardPaymentMethods ? (
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 lg:grid-cols-3'>
-                    {topupInfo?.pay_methods?.map((method) => {
+                    {standardPaymentMethods.map((method) => {
                       const minTopup = Math.max(
                         method.min_topup || 0,
                         getMinTopupAmount(topupInfo)
@@ -343,8 +354,8 @@ export function RechargeFormCard({
                           title={disabledReason}
                           aria-label={
                             disabledReason
-                              ? `${method.name}. ${disabledReason}`
-                              : method.name
+                              ? `${t(method.name)}. ${disabledReason}`
+                              : t(method.name)
                           }
                           className='min-h-14 min-w-0 justify-start gap-2 rounded-lg px-3 py-2 text-left'
                         >
@@ -360,7 +371,7 @@ export function RechargeFormCard({
                           )}
                           <span className='flex min-w-0 flex-col items-start gap-0.5'>
                             <span className='max-w-full truncate'>
-                              {method.name}
+                              {t(method.name)}
                             </span>
                             {disabledLabel && (
                               <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>

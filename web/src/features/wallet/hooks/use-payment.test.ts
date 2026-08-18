@@ -41,9 +41,46 @@ describe('payment amount routing', () => {
         calls.push('pancake')
         return { success: true, data: '4' }
       },
+      iranian: async () => {
+        calls.push('iranian')
+        return {
+          success: true,
+          data: {
+            amount_irr: 5,
+            currency: 'IRR',
+            providers: ['zarinpal'],
+            default_provider: 'zarinpal',
+          },
+        }
+      },
     })
 
     expect(amount).toBe(18.75)
     expect(calls).toEqual(['waffo:120'])
+  })
+
+  test('uses the shared Iranian quote endpoint for Zibal', async () => {
+    const calls: string[] = []
+    const amount = await requestPaymentAmount(10, PAYMENT_TYPES.ZIBAL, {
+      regular: async () => ({ success: true, data: '1' }),
+      stripe: async () => ({ success: true, data: '2' }),
+      waffo: async () => ({ success: true, data: '3' }),
+      waffoPancake: async () => ({ success: true, data: '4' }),
+      iranian: async (request) => {
+        calls.push(`iranian:${request.amount_usd}`)
+        return {
+          success: true,
+          data: {
+            amount_irr: 11_000_000,
+            currency: 'IRR',
+            providers: ['zarinpal', 'zibal'],
+            default_provider: 'zibal',
+          },
+        }
+      },
+    })
+
+    expect(amount).toBe(11_000_000)
+    expect(calls).toEqual(['iranian:10'])
   })
 })

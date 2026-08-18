@@ -1,0 +1,27 @@
+{
+  "translation": {
+    "Add Funds": "افزایش اعتبار",
+    "Amount": "مبلغ",
+    "Amount to pay:": "مبلغ قابل پرداخت:",
+    "Automatic gateway selection": "انتخاب خودکار درگاه (پیشنهادی)",
+    "Cancel": "انصراف",
+    "Change language": "تغییر زبان",
+    "Choose an amount and payment method": "مبلغ و روش پرداخت را انتخاب کنید",
+    "Confirm Payment": "تأیید پرداخت",
+    "Custom Amount": "مبلغ دلخواه",
+    "Minimum topup amount: {{amount}}": "حداقل افزایش اعتبار: {{amount}}",
+    "Minimum:": "حداقل:",
+    "No payment methods available. Please contact administrator.": "هیچ روش پرداختی فعال نیست. با مدیر سامانه تماس بگیرید.",
+    "Order History": "تاریخچه پرداخت‌ها",
+    "Payment Method": "روش پرداخت",
+    "Payment request failed": "ایجاد درخواست پرداخت ناموفق بود",
+    "Redirecting to payment page...": "در حال انتقال به صفحه پرداخت…",
+    "Review your payment details": "جزئیات پرداخت را بررسی کنید",
+    "Topup Amount": "میزان افزایش اعتبار",
+    "Wallet": "کیف پول",
+    "You Pay": "مبلغ پرداختی",
+    "You save": "میزان صرفه‌جویی",
+    "Zarinpal": "زرین‌پال",
+    "Zibal": "زیبال"
+  }
+}

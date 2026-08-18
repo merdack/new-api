@@ -36,6 +36,9 @@ export const PAYMENT_TYPES = {
   CREEM: 'creem',
   WAFFO: 'waffo',
   WAFFO_PANCAKE: 'waffo_pancake',
+  IRANIAN_AUTO: 'iranian_auto',
+  ZARINPAL: 'zarinpal',
+  ZIBAL: 'zibal',
 } as const
 
 /**
@@ -53,6 +56,9 @@ export const PAYMENT_ICON_COLORS = {
   [PAYMENT_TYPES.CREEM]: '#6366F1',
   [PAYMENT_TYPES.WAFFO]: '#2563EB',
   [PAYMENT_TYPES.WAFFO_PANCAKE]: '#F97316',
+  [PAYMENT_TYPES.IRANIAN_AUTO]: '#0F766E',
+  [PAYMENT_TYPES.ZARINPAL]: '#2563EB',
+  [PAYMENT_TYPES.ZIBAL]: '#DC2626',
 } as const
 
 /**

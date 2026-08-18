@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { DirectionProvider as BaseDirectionProvider } from '@base-ui/react/direction-provider'
 import { createContext, useContext, useEffect, useState } from 'react'
 
+import i18n from '@/i18n/config'
 import { getCookie, setCookie, removeCookie } from '@/lib/cookies'
 
 export type Direction = 'ltr' | 'rtl'
@@ -26,6 +27,10 @@ export type Direction = 'ltr' | 'rtl'
 const DEFAULT_DIRECTION = 'ltr'
 const DIRECTION_COOKIE_NAME = 'dir'
 const DIRECTION_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 // 1 year
+
+function languageDirection(language?: string): Direction {
+  return language?.toLowerCase().startsWith('fa') ? 'rtl' : 'ltr'
+}
 
 type DirectionContextType = {
   defaultDir: Direction
@@ -38,13 +43,25 @@ const DirectionContext = createContext<DirectionContextType | null>(null)
 
 export function DirectionProvider({ children }: { children: React.ReactNode }) {
   const [dir, _setDir] = useState<Direction>(
-    () => (getCookie(DIRECTION_COOKIE_NAME) as Direction) || DEFAULT_DIRECTION
+    () =>
+      (getCookie(DIRECTION_COOKIE_NAME) as Direction) ||
+      languageDirection(i18n.resolvedLanguage)
   )
 
   useEffect(() => {
     const htmlElement = document.documentElement
     htmlElement.setAttribute('dir', dir)
   }, [dir])
+
+  useEffect(() => {
+    const handleLanguageChange = (language: string) => {
+      if (!getCookie(DIRECTION_COOKIE_NAME)) {
+        _setDir(languageDirection(language))
+      }
+    }
+    i18n.on('languageChanged', handleLanguageChange)
+    return () => i18n.off('languageChanged', handleLanguageChange)
+  }, [])
 
   const setDir = (dir: Direction) => {
     _setDir(dir)

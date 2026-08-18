@@ -61,6 +61,14 @@ export function formatCurrency(amount: number | string): string {
   }).format(numeric)
 }
 
+export function formatPaymentAmount(
+  amount: number | string,
+  currency?: string
+): string {
+  const formatted = formatCurrency(amount)
+  return currency === 'IRR' ? `${formatted} IRR` : formatted
+}
+
 /**
  * Get discount label for display (e.g., "20% OFF")
  */

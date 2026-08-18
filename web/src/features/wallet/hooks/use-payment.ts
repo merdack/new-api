@@ -25,29 +25,42 @@ import {
   calculateStripeAmount,
   calculateWaffoAmount,
   calculateWaffoPancakeAmount,
+  calculateIranianAmount,
   requestPayment,
   requestStripePayment,
+  requestIranianPayment,
   isApiSuccess,
 } from '../api'
 import {
   isStripePayment,
   isWaffoPayment,
   isWaffoPancakePayment,
+  isIranianPayment,
   submitPaymentForm,
 } from '../lib'
-import type { AmountRequest, AmountResponse } from '../types'
+import type {
+  AmountRequest,
+  AmountResponse,
+  IranianAmountResponse,
+  IranianPaymentProvider,
+  IranianPaymentRequest,
+} from '../types'
 
 // ============================================================================
 // Payment Hook
 // ============================================================================
 
 type AmountCalculator = (request: AmountRequest) => Promise<AmountResponse>
+type IranianAmountCalculator = (
+  request: IranianPaymentRequest
+) => Promise<IranianAmountResponse>
 
 export interface PaymentAmountCalculators {
   regular: AmountCalculator
   stripe: AmountCalculator
   waffo: AmountCalculator
   waffoPancake: AmountCalculator
+  iranian: IranianAmountCalculator
 }
 
 const defaultPaymentAmountCalculators: PaymentAmountCalculators = {
@@ -55,6 +68,7 @@ const defaultPaymentAmountCalculators: PaymentAmountCalculators = {
   stripe: calculateStripeAmount,
   waffo: calculateWaffoAmount,
   waffoPancake: calculateWaffoPancakeAmount,
+  iranian: calculateIranianAmount,
 }
 
 export async function requestPaymentAmount(
@@ -62,6 +76,14 @@ export async function requestPaymentAmount(
   paymentType: string,
   calculators: PaymentAmountCalculators = defaultPaymentAmountCalculators
 ): Promise<number> {
+  if (isIranianPayment(paymentType)) {
+    const response = await calculators.iranian({ amount_usd: topupAmount })
+    if (!isApiSuccess(response) || !response.data) {
+      return 0
+    }
+    return response.data.amount_irr
+  }
+
   let calculator = calculators.regular
   if (isStripePayment(paymentType)) {
     calculator = calculators.stripe
@@ -113,6 +135,25 @@ export function usePayment() {
 
         const isStripe = isStripePayment(paymentType)
         const amount = Math.floor(topupAmount)
+
+        const isIranian = isIranianPayment(paymentType)
+        if (isIranian) {
+          let provider: IranianPaymentProvider | undefined
+          if (paymentType === 'zarinpal' || paymentType === 'zibal') {
+            provider = paymentType
+          }
+          const response = await requestIranianPayment({
+            amount_usd: amount,
+            provider,
+          })
+          if (!isApiSuccess(response) || !response.data?.pay_link) {
+            toast.error(response.message || i18next.t('Payment request failed'))
+            return false
+          }
+          window.location.assign(response.data.pay_link)
+          toast.success(i18next.t('Redirecting to payment page...'))
+          return true
+        }
 
         const response = isStripe
           ? await requestStripePayment({

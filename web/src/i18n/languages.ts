@@ -20,6 +20,7 @@ export const INTERFACE_LANGUAGE_OPTIONS = [
   { code: 'zhCN', label: '简体中文' },
   { code: 'en', label: 'English' },
   { code: 'fr', label: 'Français' },
+  { code: 'fa', label: 'فارسی' },
   { code: 'ru', label: 'Русский' },
   { code: 'ja', label: '日本語' },
   { code: 'vi', label: 'Tiếng Việt' },

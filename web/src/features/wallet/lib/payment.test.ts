@@ -24,6 +24,8 @@ import {
   isStripePayment,
   isWaffoPayment,
   isWaffoPancakePayment,
+  isIranianPayment,
+  getIranianPaymentMethods,
 } from './payment'
 
 describe('payment type classification', () => {
@@ -33,6 +35,50 @@ describe('payment type classification', () => {
     expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO_PANCAKE)).toBe(true)
     expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO)).toBe(false)
     expect(isStripePayment(PAYMENT_TYPES.STRIPE)).toBe(true)
+    expect(isIranianPayment(PAYMENT_TYPES.IRANIAN_AUTO)).toBe(true)
+    expect(isIranianPayment(PAYMENT_TYPES.ZARINPAL)).toBe(true)
+    expect(isIranianPayment(PAYMENT_TYPES.ZIBAL)).toBe(true)
+  })
+})
+
+describe('Iranian gateway choices', () => {
+  test('shows automatic failover before both explicit gateways', () => {
+    const methods = getIranianPaymentMethods({
+      enable_online_topup: false,
+      enable_stripe_topup: false,
+      enable_zarinpal_topup: true,
+      enable_zibal_topup: true,
+      iranian_payment_auto_failover: true,
+      zarinpal_min_topup_usd: 5,
+      pay_methods: [],
+      min_topup: 1,
+      stripe_min_topup: 1,
+      amount_options: [],
+      discount: {},
+    })
+
+    expect(methods.map((method) => method.type)).toEqual([
+      PAYMENT_TYPES.IRANIAN_AUTO,
+      PAYMENT_TYPES.ZARINPAL,
+      PAYMENT_TYPES.ZIBAL,
+    ])
+    expect(methods.every((method) => method.min_topup === 5)).toBe(true)
+  })
+
+  test('does not offer automatic selection when only Zibal is enabled', () => {
+    const methods = getIranianPaymentMethods({
+      enable_online_topup: false,
+      enable_stripe_topup: false,
+      enable_zibal_topup: true,
+      iranian_payment_auto_failover: true,
+      pay_methods: [],
+      min_topup: 1,
+      stripe_min_topup: 1,
+      amount_options: [],
+      discount: {},
+    })
+
+    expect(methods.map((method) => method.type)).toEqual([PAYMENT_TYPES.ZIBAL])
   })
 })
 
