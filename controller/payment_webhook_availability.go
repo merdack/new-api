@@ -20,6 +20,11 @@ func isStripeTopUpEnabled() bool {
 		strings.TrimSpace(setting.StripePriceId) != ""
 }
 
+func isZarinpalTopUpEnabled() bool {
+	return isPaymentComplianceConfirmed() && strings.TrimSpace(setting.ZarinpalMerchantID) != "" &&
+		setting.ZarinpalIRRPerUSD > 0 && setting.ZarinpalMarginBPS >= 0 && setting.ZarinpalMarginBPS <= 10000
+}
+
 func isStripeWebhookConfigured() bool {
 	return strings.TrimSpace(setting.StripeWebhookSecret) != ""
 }
