@@ -19,7 +19,7 @@ func TestZarinpalQuoteSnapshotsRateAndMargin(t *testing.T) {
 	setting.ZarinpalMarginBPS = 1000
 	setting.ZarinpalMinTopUpUSD = 1
 
-	amountIRR, quota, err := zarinpalQuote(10)
+	amountIRR, quota, err := iranianPaymentQuote(10)
 	require.NoError(t, err)
 	assert.Equal(t, int64(11_000_000), amountIRR)
 	expectedQuota, err := common.QuotaFromDecimalStrict(decimal.NewFromInt(10).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))

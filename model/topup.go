@@ -38,6 +38,7 @@ const (
 	PaymentMethodWaffoPancake = "waffo_pancake"
 	PaymentMethodBalance      = "balance"
 	PaymentMethodZarinpal     = "zarinpal"
+	PaymentMethodZibal        = "zibal"
 )
 
 const (
@@ -48,6 +49,7 @@ const (
 	PaymentProviderWaffoPancake = "waffo_pancake"
 	PaymentProviderBalance      = "balance"
 	PaymentProviderZarinpal     = "zarinpal"
+	PaymentProviderZibal        = "zibal"
 )
 
 func GetTopUpByProviderReference(provider, reference string) *TopUp {
@@ -61,16 +63,16 @@ func GetTopUpByProviderReference(provider, reference string) *TopUp {
 	return &topUp
 }
 
-// RechargeZarinpal credits the immutable quota captured when the IRR quote was
+// RechargeIranianTopUp credits the immutable quota captured when the IRR quote was
 // created. It never recalculates using the current exchange rate.
-func RechargeZarinpal(authority, receipt, callerIP string) (alreadyDone bool, err error) {
-	if authority == "" {
+func RechargeIranianTopUp(provider, reference, receipt, callerIP string) (alreadyDone bool, err error) {
+	if reference == "" || (provider != PaymentProviderZarinpal && provider != PaymentProviderZibal) {
 		return false, ErrTopUpNotFound
 	}
 	var topUp TopUp
 	var quotaToAdd int
 	err = DB.Transaction(func(tx *gorm.DB) error {
-		if err := lockForUpdate(tx).Where("payment_provider = ? AND provider_reference = ?", PaymentProviderZarinpal, authority).First(&topUp).Error; err != nil {
+		if err := lockForUpdate(tx).Where("payment_provider = ? AND provider_reference = ?", provider, reference).First(&topUp).Error; err != nil {
 			return ErrTopUpNotFound
 		}
 		if topUp.Status == common.TopUpStatusSuccess {
@@ -92,8 +94,8 @@ func RechargeZarinpal(authority, receipt, callerIP string) (alreadyDone bool, er
 	if err != nil || alreadyDone {
 		return alreadyDone, err
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, "zarinpal topup")
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("Zarinpal top-up credited: %v", logger.LogQuota(quotaToAdd)), callerIP, PaymentMethodZarinpal, PaymentProviderZarinpal)
+	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, provider+" topup")
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("Iranian gateway top-up credited: %v", logger.LogQuota(quotaToAdd)), callerIP, provider, provider)
 	return false, nil
 }
 

@@ -63,10 +63,11 @@ func (z *ZarinpalClient) post(path string, payload any) (*zarinpalResponse, erro
 	return &result, nil
 }
 
-func (z *ZarinpalClient) Request(amountIRR int64, callbackURL, description string) (string, error) {
+func (z *ZarinpalClient) Request(amountIRR int64, callbackURL, description, orderID string) (string, error) {
 	result, err := z.post("/pg/v4/payment/request.json", map[string]any{
 		"merchant_id": z.MerchantID, "amount": amountIRR, "currency": "IRR",
 		"callback_url": callbackURL, "description": description,
+		"metadata": map[string]string{"order_id": orderID},
 	})
 	if err != nil {
 		return "", err

@@ -27,7 +27,7 @@ func TestZarinpalRequestAndVerifyContracts(t *testing.T) {
 
 	client := NewZarinpalClient("merchant", false)
 	client.BaseURL = server.URL
-	authority, err := client.Request(12345, "https://example.com/callback", "test")
+	authority, err := client.Request(12345, "https://example.com/callback", "test", "order-1")
 	require.NoError(t, err)
 	assert.Equal(t, "S0001", authority)
 	assert.Equal(t, int64(12345), requestAmount)

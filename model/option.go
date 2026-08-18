@@ -95,6 +95,9 @@ func InitOptionMap() {
 	common.OptionMap["ZarinpalIRRPerUSD"] = strconv.FormatInt(setting.ZarinpalIRRPerUSD, 10)
 	common.OptionMap["ZarinpalMarginBPS"] = strconv.Itoa(setting.ZarinpalMarginBPS)
 	common.OptionMap["ZarinpalMinTopUpUSD"] = strconv.Itoa(setting.ZarinpalMinTopUpUSD)
+	common.OptionMap["ZibalMerchant"] = setting.ZibalMerchant
+	common.OptionMap["IranianPaymentDefault"] = setting.IranianPaymentDefault
+	common.OptionMap["IranianPaymentAutoFailover"] = strconv.FormatBool(setting.IranianPaymentAutoFailover)
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
@@ -233,6 +236,10 @@ func validateOptionValue(key string, value string) error {
 		minimum, err := strconv.Atoi(value)
 		if err != nil || minimum <= 0 {
 			return fmt.Errorf("ZarinpalMinTopUpUSD must be a positive integer")
+		}
+	case "IranianPaymentDefault":
+		if value != PaymentProviderZarinpal && value != PaymentProviderZibal {
+			return fmt.Errorf("IranianPaymentDefault must be zarinpal or zibal")
 		}
 	}
 	return nil
@@ -472,6 +479,12 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.ZarinpalMarginBPS, _ = strconv.Atoi(value)
 	case "ZarinpalMinTopUpUSD":
 		setting.ZarinpalMinTopUpUSD, _ = strconv.Atoi(value)
+	case "ZibalMerchant":
+		setting.ZibalMerchant = value
+	case "IranianPaymentDefault":
+		setting.IranianPaymentDefault = value
+	case "IranianPaymentAutoFailover":
+		setting.IranianPaymentAutoFailover = value == "true"
 	case "StripeMinTopUp":
 		setting.StripeMinTopUp, _ = strconv.Atoi(value)
 	case "StripePromotionCodesEnabled":

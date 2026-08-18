@@ -16,25 +16,38 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type ZarinpalPayRequest struct {
-	AmountUSD int64 `json:"amount_usd"`
+type IranianPayRequest struct {
+	AmountUSD int64  `json:"amount_usd"`
+	Provider  string `json:"provider"`
 }
 
-func RequestZarinpalAmount(c *gin.Context) {
-	var req ZarinpalPayRequest
+type iranianPaymentResult struct {
+	Provider  string
+	PayLink   string
+	AmountIRR int64
+}
+
+func RequestZarinpalAmount(c *gin.Context) { requestIranianAmount(c) }
+func RequestIranianAmount(c *gin.Context)  { requestIranianAmount(c) }
+
+func requestIranianAmount(c *gin.Context) {
+	var req IranianPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiErrorMsg(c, "invalid payment request")
 		return
 	}
-	amountIRR, _, err := zarinpalQuote(req.AmountUSD)
+	amountIRR, _, err := iranianPaymentQuote(req.AmountUSD)
 	if err != nil || amountIRR < 10000 {
 		common.ApiErrorMsg(c, "invalid payment quote")
 		return
 	}
-	common.ApiSuccess(c, gin.H{"amount_irr": amountIRR, "currency": "IRR"})
+	common.ApiSuccess(c, gin.H{
+		"amount_irr": amountIRR, "currency": "IRR",
+		"providers": enabledIranianProviders(), "default_provider": normalizedIranianDefault(),
+	})
 }
 
-func zarinpalQuote(amountUSD int64) (amountIRR int64, creditedQuota int, err error) {
+func iranianPaymentQuote(amountUSD int64) (amountIRR int64, creditedQuota int, err error) {
 	if amountUSD < int64(setting.ZarinpalMinTopUpUSD) || setting.ZarinpalIRRPerUSD <= 0 {
 		return 0, 0, fmt.Errorf("invalid top-up amount or exchange rate")
 	}
@@ -55,75 +68,174 @@ func zarinpalQuote(amountUSD int64) (amountIRR int64, creditedQuota int, err err
 	return quoted.IntPart(), quota, nil
 }
 
-func RequestZarinpalPay(c *gin.Context) {
-	if !isZarinpalTopUpEnabled() {
-		common.ApiErrorMsg(c, "payment gateway is not configured")
-		return
+func normalizedIranianDefault() string {
+	provider := strings.ToLower(strings.TrimSpace(setting.IranianPaymentDefault))
+	if provider != model.PaymentProviderZibal {
+		return model.PaymentProviderZarinpal
 	}
-	var req ZarinpalPayRequest
+	return provider
+}
+
+func enabledIranianProviders() []string {
+	providers := make([]string, 0, 2)
+	for _, provider := range []string{model.PaymentProviderZarinpal, model.PaymentProviderZibal} {
+		if isIranianGatewayEnabled(provider) {
+			providers = append(providers, provider)
+		}
+	}
+	return providers
+}
+
+func iranianProviderOrder(requested string) ([]string, error) {
+	requested = strings.ToLower(strings.TrimSpace(requested))
+	if requested != "" {
+		if requested != model.PaymentProviderZarinpal && requested != model.PaymentProviderZibal {
+			return nil, fmt.Errorf("unsupported payment provider")
+		}
+		if !isIranianGatewayEnabled(requested) {
+			return nil, fmt.Errorf("payment gateway is not configured")
+		}
+		return []string{requested}, nil
+	}
+	first := normalizedIranianDefault()
+	second := model.PaymentProviderZibal
+	if first == second {
+		second = model.PaymentProviderZarinpal
+	}
+	providers := make([]string, 0, 2)
+	for _, provider := range []string{first, second} {
+		if isIranianGatewayEnabled(provider) {
+			providers = append(providers, provider)
+		}
+	}
+	if len(providers) == 0 {
+		return nil, fmt.Errorf("payment gateway is not configured")
+	}
+	if !setting.IranianPaymentAutoFailover && len(providers) > 1 {
+		providers = providers[:1]
+	}
+	return providers, nil
+}
+
+func createIranianPayment(c *gin.Context, amountUSD int64, provider string) (*iranianPaymentResult, bool, error) {
+	amountIRR, creditedQuota, err := iranianPaymentQuote(amountUSD)
+	if err != nil || amountIRR < 10000 {
+		return nil, false, fmt.Errorf("invalid payment quote")
+	}
+	userID := c.GetInt("id")
+	if err := model.ValidateTopUpQuotaCapacity(userID, creditedQuota); err != nil {
+		return nil, false, err
+	}
+	orderID := fmt.Sprintf("na-%d-%s", time.Now().UnixMilli(), common.GetRandomString(10))
+	description := fmt.Sprintf("AI API credit for user %d", userID)
+	var reference, payLink string
+	switch provider {
+	case model.PaymentProviderZarinpal:
+		client := service.NewZarinpalClient(setting.ZarinpalMerchantID, setting.ZarinpalSandbox)
+		reference, err = client.Request(amountIRR, service.GetCallbackAddress()+"/api/user/zarinpal/return", description, orderID)
+		if err == nil {
+			payLink = client.PaymentURL(reference)
+		}
+	case model.PaymentProviderZibal:
+		client := service.NewZibalClient(setting.ZibalMerchant)
+		reference, err = client.Request(amountIRR, service.GetCallbackAddress()+"/api/user/zibal/return", description, orderID)
+		if err == nil {
+			payLink = client.PaymentURL(reference)
+		}
+	default:
+		return nil, false, fmt.Errorf("unsupported payment provider")
+	}
+	if err != nil {
+		return nil, true, err
+	}
+	topUp := &model.TopUp{
+		UserId: userID, Amount: amountUSD, Money: float64(amountIRR), TradeNo: provider + "_" + reference,
+		PaymentMethod: provider, PaymentProvider: provider, CreateTime: time.Now().Unix(), Status: common.TopUpStatusPending,
+		CreditedQuota: creditedQuota, PaidAmountMinor: amountIRR, Currency: "IRR",
+		ExchangeRate: setting.ZarinpalIRRPerUSD, PricingMarginBPS: setting.ZarinpalMarginBPS, ProviderReference: reference,
+	}
+	if err := topUp.Insert(); err != nil {
+		// A remote identifier now exists. Switching providers could create two
+		// payable orders for one user action, so this error is not retryable.
+		return nil, false, fmt.Errorf("payment order persistence failed: %w", err)
+	}
+	return &iranianPaymentResult{Provider: provider, PayLink: payLink, AmountIRR: amountIRR}, false, nil
+}
+
+func RequestIranianPay(c *gin.Context)  { requestIranianPay(c, "") }
+func RequestZarinpalPay(c *gin.Context) { requestIranianPay(c, model.PaymentProviderZarinpal) }
+func RequestZibalPay(c *gin.Context)    { requestIranianPay(c, model.PaymentProviderZibal) }
+
+func requestIranianPay(c *gin.Context, forcedProvider string) {
+	var req IranianPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiErrorMsg(c, "invalid payment request")
 		return
 	}
-	amountIRR, creditedQuota, err := zarinpalQuote(req.AmountUSD)
-	if err != nil || amountIRR < 10000 {
-		common.ApiErrorMsg(c, "invalid payment quote")
-		return
+	if forcedProvider != "" {
+		req.Provider = forcedProvider
 	}
-	userID := c.GetInt("id")
-	if err := model.ValidateTopUpQuotaCapacity(userID, creditedQuota); err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	client := service.NewZarinpalClient(setting.ZarinpalMerchantID, setting.ZarinpalSandbox)
-	callbackURL := service.GetCallbackAddress() + "/api/user/zarinpal/return"
-	authority, err := client.Request(amountIRR, callbackURL, fmt.Sprintf("AI API credit for user %d", userID))
+	providers, err := iranianProviderOrder(req.Provider)
 	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Zarinpal payment request failed user_id=%d error=%q", userID, err.Error()))
-		common.ApiErrorMsg(c, "payment gateway request failed")
+		common.ApiErrorMsg(c, err.Error())
 		return
 	}
-	topUp := &model.TopUp{
-		UserId: userID, Amount: req.AmountUSD, Money: float64(amountIRR),
-		TradeNo: "zarinpal_" + authority, PaymentMethod: model.PaymentMethodZarinpal,
-		PaymentProvider: model.PaymentProviderZarinpal, CreateTime: time.Now().Unix(),
-		Status: common.TopUpStatusPending, CreditedQuota: creditedQuota,
-		PaidAmountMinor: amountIRR, Currency: "IRR", ExchangeRate: setting.ZarinpalIRRPerUSD,
-		PricingMarginBPS: setting.ZarinpalMarginBPS, ProviderReference: authority,
+	for index, provider := range providers {
+		result, retryable, createErr := createIranianPayment(c, req.AmountUSD, provider)
+		if createErr == nil {
+			common.ApiSuccess(c, gin.H{"provider": result.Provider, "pay_link": result.PayLink, "amount_irr": result.AmountIRR, "currency": "IRR"})
+			return
+		}
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Iranian payment request failed provider=%s user_id=%d error=%q", provider, c.GetInt("id"), createErr.Error()))
+		if !retryable || index == len(providers)-1 {
+			if createErr == model.ErrTopUpQuotaLimitExceeded {
+				common.ApiError(c, createErr)
+			} else {
+				common.ApiErrorMsg(c, "payment gateway request failed")
+			}
+			return
+		}
 	}
-	if err := topUp.Insert(); err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Zarinpal order persistence failed user_id=%d error=%q", userID, err.Error()))
-		common.ApiErrorMsg(c, "payment order creation failed")
-		return
-	}
-	common.ApiSuccess(c, gin.H{"pay_link": client.PaymentURL(authority), "amount_irr": amountIRR, "currency": "IRR"})
 }
 
 func ZarinpalReturn(c *gin.Context) {
-	authority := strings.TrimSpace(c.Query("Authority"))
-	status := strings.TrimSpace(c.Query("Status"))
-	topUp := model.GetTopUpByProviderReference(model.PaymentProviderZarinpal, authority)
+	reference := strings.TrimSpace(c.Query("Authority"))
+	settleIranianReturn(c, model.PaymentProviderZarinpal, reference, strings.TrimSpace(c.Query("Status")) == "OK")
+}
+
+func ZibalReturn(c *gin.Context) {
+	reference := strings.TrimSpace(c.Query("trackId"))
+	settleIranianReturn(c, model.PaymentProviderZibal, reference, strings.TrimSpace(c.Query("success")) == "1")
+}
+
+func settleIranianReturn(c *gin.Context, provider, reference string, callbackSucceeded bool) {
+	topUp := model.GetTopUpByProviderReference(provider, reference)
 	if topUp == nil {
-		c.Redirect(http.StatusFound, paymentReturnPath("/wallet?payment=zarinpal_not_found"))
+		c.Redirect(http.StatusFound, paymentReturnPath("/wallet?payment="+provider+"_not_found"))
 		return
 	}
 	if topUp.Status == common.TopUpStatusSuccess {
 		c.Redirect(http.StatusFound, paymentReturnPath("/wallet?payment=success"))
 		return
 	}
-	if status != "OK" {
+	if !callbackSucceeded {
 		c.Redirect(http.StatusFound, paymentReturnPath("/wallet?payment=cancelled"))
 		return
 	}
-	client := service.NewZarinpalClient(setting.ZarinpalMerchantID, setting.ZarinpalSandbox)
-	receipt, err := client.Verify(topUp.PaidAmountMinor, authority)
+	var receipt string
+	var err error
+	if provider == model.PaymentProviderZarinpal {
+		receipt, err = service.NewZarinpalClient(setting.ZarinpalMerchantID, setting.ZarinpalSandbox).Verify(topUp.PaidAmountMinor, reference)
+	} else {
+		receipt, err = service.NewZibalClient(setting.ZibalMerchant).Verify(reference, topUp.PaidAmountMinor)
+	}
 	if err != nil {
-		logger.LogWarn(c.Request.Context(), fmt.Sprintf("Zarinpal verification failed trade_no=%s error=%q", topUp.TradeNo, err.Error()))
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("Iranian payment verification failed provider=%s trade_no=%s error=%q", provider, topUp.TradeNo, err.Error()))
 		c.Redirect(http.StatusFound, paymentReturnPath("/wallet?payment=verification_failed"))
 		return
 	}
-	if _, err := model.RechargeZarinpal(authority, receipt, c.ClientIP()); err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Zarinpal settlement failed trade_no=%s error=%q", topUp.TradeNo, err.Error()))
+	if _, err := model.RechargeIranianTopUp(provider, reference, receipt, c.ClientIP()); err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Iranian payment settlement failed provider=%s trade_no=%s error=%q", provider, topUp.TradeNo, err.Error()))
 		c.Redirect(http.StatusFound, paymentReturnPath("/wallet?payment=settlement_failed"))
 		return
 	}
