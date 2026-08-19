@@ -147,6 +147,8 @@ export interface TopupInfo {
   iranian_payment_default?: IranianPaymentProvider
   /** Whether provider-neutral checkout may fail over */
   iranian_payment_auto_failover?: boolean
+  /** Whether the wallet hides non-Iranian payment methods */
+  iranian_payment_exclusive_ui?: boolean
   /** Available payment methods */
   pay_methods: PaymentMethod[]
   /** Minimum topup amount for online topup */

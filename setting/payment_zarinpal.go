@@ -9,4 +9,5 @@ var (
 	ZibalMerchant                    = ""
 	IranianPaymentDefault            = "zarinpal"
 	IranianPaymentAutoFailover       = true
+	IranianPaymentExclusiveUI         = false
 )

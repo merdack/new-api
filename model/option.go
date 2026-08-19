@@ -98,6 +98,7 @@ func InitOptionMap() {
 	common.OptionMap["ZibalMerchant"] = setting.ZibalMerchant
 	common.OptionMap["IranianPaymentDefault"] = setting.IranianPaymentDefault
 	common.OptionMap["IranianPaymentAutoFailover"] = strconv.FormatBool(setting.IranianPaymentAutoFailover)
+	common.OptionMap["IranianPaymentExclusiveUI"] = strconv.FormatBool(setting.IranianPaymentExclusiveUI)
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
@@ -485,6 +486,8 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.IranianPaymentDefault = value
 	case "IranianPaymentAutoFailover":
 		setting.IranianPaymentAutoFailover = value == "true"
+	case "IranianPaymentExclusiveUI":
+		setting.IranianPaymentExclusiveUI = value == "true"
 	case "StripeMinTopUp":
 		setting.StripeMinTopUp, _ = strconv.Atoi(value)
 	case "StripePromotionCodesEnabled":

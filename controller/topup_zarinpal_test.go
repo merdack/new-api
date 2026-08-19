@@ -91,3 +91,15 @@ func TestIranianProviderOrderExplicitConfiguredProviderSucceeds(t *testing.T) {
 	assert.Equal(t, []string{"zibal"}, providers)
 }
 
+func TestIranianPaymentExclusiveUIDefaultsOff(t *testing.T) {
+	oldExclusive := setting.IranianPaymentExclusiveUI
+	t.Cleanup(func() {
+		setting.IranianPaymentExclusiveUI = oldExclusive
+	})
+
+	setting.IranianPaymentExclusiveUI = false
+	assert.False(t, setting.IranianPaymentExclusiveUI)
+
+	setting.IranianPaymentExclusiveUI = true
+	assert.True(t, setting.IranianPaymentExclusiveUI)
+}

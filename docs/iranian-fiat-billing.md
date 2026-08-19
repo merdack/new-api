@@ -13,9 +13,12 @@ For staging verification and the required evidence bundle, follow the [Persian H
 | `ZibalMerchant` | Zibal merchant identifier (`zibal` is available for provider testing) |
 | `IranianPaymentDefault` | Default provider: `zarinpal` or `zibal` |
 | `IranianPaymentAutoFailover` | Try the other configured provider if checkout creation fails before an identifier is issued |
+| `IranianPaymentExclusiveUI` | Hide non-Iranian payment methods in the wallet UI without disabling their backend endpoints |
 | `ZarinpalIRRPerUSD` | Current integer IRR sale rate for one USD of API credit, shared by both providers |
 | `ZarinpalMarginBPS` | Safety/commercial margin in basis points (`1000` = 10%) |
 | `ZarinpalMinTopUpUSD` | Minimum whole-dollar credit purchase |
+
+For an Iranian deployment, set `IranianPaymentExclusiveUI=true`. This is a presentation control: it removes Epay, Stripe, Creem, and Waffo choices from the wallet response while preserving their configuration and API endpoints for mixed or future deployments.
 
 The charged amount is rounded up:
 

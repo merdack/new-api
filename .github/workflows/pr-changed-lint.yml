@@ -1,0 +1,32 @@
+name: PR changed frontend lint
+
+on:
+  pull_request:
+    paths:
+      - 'web/src/**'
+      - 'web/package.json'
+      - 'web/bun.lock'
+      - 'web/.oxlintrc.json'
+      - 'web/scripts/lint-changed.mjs'
+      - '.github/workflows/pr-changed-lint.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint-changed:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+      - name: Lint changed frontend files
+        env:
+          LINT_BASE_REF: origin/${{ github.base_ref }}
+        run: bun run lint:changed

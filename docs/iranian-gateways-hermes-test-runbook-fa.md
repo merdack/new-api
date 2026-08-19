@@ -171,6 +171,7 @@ set_option ZarinpalMarginBPS "$TEST_MARGIN_BPS"
 set_option ZarinpalMinTopUpUSD 1
 set_option IranianPaymentDefault zarinpal
 set_option IranianPaymentAutoFailover true
+set_option IranianPaymentExclusiveUI true
 ```
 
 پس از تنظیمات، سرویس را یک‌بار restart کن و دوباره health check بگیر. روش restart باید مطابق deployment موجود باشد؛ برای Docker Compose معمولاً:
@@ -372,6 +373,7 @@ set_option ZarinpalMarginBPS "$TEST_MARGIN_BPS"
 set_option ZarinpalMinTopUpUSD 1
 set_option IranianPaymentDefault zarinpal
 set_option IranianPaymentAutoFailover true
+set_option IranianPaymentExclusiveUI true
 ```
 
 سفارش‌های آزمایشی را حذف نکن. آن‌ها برای audit و reconciliation لازم هستند. فقط در گزارش مشخص کن کدام سفارش‌ها آزمایشی بوده‌اند.
