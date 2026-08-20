@@ -25,8 +25,10 @@ type TopUp struct {
 	CreditedQuota     int     `json:"credited_quota"`
 	PaidAmountMinor   int64   `json:"paid_amount_minor"`
 	Currency          string  `json:"currency" gorm:"type:varchar(8);default:''"`
-	ExchangeRate      int64   `json:"exchange_rate"`
-	PricingMarginBPS  int     `json:"pricing_margin_bps"`
+	ExchangeRate          int64  `json:"exchange_rate"`
+	ExchangeRateSource    string `json:"exchange_rate_source" gorm:"type:varchar(64);default:''"`
+	ExchangeRateUpdatedAt int64  `json:"exchange_rate_updated_at"`
+	PricingMarginBPS      int    `json:"pricing_margin_bps"`
 	ProviderReference string  `json:"provider_reference" gorm:"type:varchar(255);index"`
 	ProviderReceipt   string  `json:"provider_receipt" gorm:"type:varchar(255);default:''"`
 }

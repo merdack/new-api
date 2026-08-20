@@ -15,6 +15,10 @@ For staging verification and the required evidence bundle, follow the [Persian H
 | `IranianPaymentAutoFailover` | Try the other configured provider if checkout creation fails before an identifier is issued |
 | `IranianPaymentExclusiveUI` | Hide non-Iranian payment methods in the wallet UI without disabling their backend endpoints |
 | `ZarinpalIRRPerUSD` | Current integer IRR sale rate for one USD of API credit, shared by both providers |
+| `IranianFXRateGuardEnabled` | Reject quote and checkout when rate metadata is absent, stale, or too far in the future |
+| `IranianFXRateSource` | Short audit label for the rate source |
+| `IranianFXRateUpdatedAt` | Unix timestamp for the rate observation |
+| `IranianFXRateMaxAgeSeconds` | Maximum accepted rate age; default 900 seconds |
 | `ZarinpalMarginBPS` | Safety/commercial margin in basis points (`1000` = 10%) |
 | `ZarinpalMinTopUpUSD` | Minimum whole-dollar credit purchase |
 
@@ -26,7 +30,9 @@ The charged amount is rounded up:
 amount_irr = ceil(amount_usd * irr_per_usd * (10000 + margin_bps) / 10000)
 ```
 
-The exact IRR amount, exchange rate, margin, provider, provider reference, and credited quota are persisted on the order. A later exchange-rate or model-price change never changes a pending or completed order.
+The exact IRR amount, exchange rate, rate source, rate observation timestamp, margin, provider, provider reference, and credited quota are persisted on the order. A later exchange-rate or model-price change never changes a pending or completed order.
+
+Enable the guard only after setting the source and timestamp. Update the numeric rate and source first, set `IranianFXRateUpdatedAt` last, then enable the guard. A timestamp more than 60 seconds in the future is rejected.
 
 Model token prices remain in New API's billing configuration. Prefer tiered billing expressions because settlement captures the expression used for the request. Update expressions when the AntSeed retail allowlist changes; do not recalculate historical usage.
 

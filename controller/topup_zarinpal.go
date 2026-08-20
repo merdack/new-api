@@ -27,6 +27,49 @@ type iranianPaymentResult struct {
 	AmountIRR int64
 }
 
+type iranianFXRateSnapshot struct {
+	Rate      int64
+	Source    string
+	UpdatedAt int64
+	MaxAge    int64
+	MarginBPS int
+	Guarded   bool
+	ExpiresAt int64
+}
+
+const iranianFXRateFutureSkewSeconds int64 = 60
+
+func currentIranianFXRateSnapshot(now time.Time) (iranianFXRateSnapshot, error) {
+	snapshot := iranianFXRateSnapshot{
+		Rate:      setting.ZarinpalIRRPerUSD,
+		Source:    strings.TrimSpace(setting.IranianFXRateSource),
+		UpdatedAt: setting.IranianFXRateUpdatedAt,
+		MaxAge:    setting.IranianFXRateMaxAgeSeconds,
+		MarginBPS: setting.ZarinpalMarginBPS,
+		Guarded:   setting.IranianFXRateGuardEnabled,
+	}
+	if snapshot.UpdatedAt > 0 && snapshot.MaxAge > 0 {
+		snapshot.ExpiresAt = snapshot.UpdatedAt + snapshot.MaxAge
+	}
+	if snapshot.Rate <= 0 {
+		return snapshot, fmt.Errorf("invalid exchange rate")
+	}
+	if !snapshot.Guarded {
+		return snapshot, nil
+	}
+	if snapshot.Source == "" || snapshot.UpdatedAt <= 0 || snapshot.MaxAge <= 0 {
+		return snapshot, fmt.Errorf("exchange rate metadata is not configured")
+	}
+	nowUnix := now.Unix()
+	if snapshot.UpdatedAt > nowUnix+iranianFXRateFutureSkewSeconds {
+		return snapshot, fmt.Errorf("exchange rate timestamp is in the future")
+	}
+	if nowUnix-snapshot.UpdatedAt > snapshot.MaxAge {
+		return snapshot, fmt.Errorf("exchange rate is stale")
+	}
+	return snapshot, nil
+}
+
 func RequestZarinpalAmount(c *gin.Context) { requestIranianAmount(c) }
 func RequestIranianAmount(c *gin.Context)  { requestIranianAmount(c) }
 
@@ -36,7 +79,12 @@ func requestIranianAmount(c *gin.Context) {
 		common.ApiErrorMsg(c, "invalid payment request")
 		return
 	}
-	amountIRR, _, err := iranianPaymentQuote(req.AmountUSD)
+	rate, err := currentIranianFXRateSnapshot(time.Now())
+	if err != nil {
+		common.ApiErrorMsg(c, "invalid payment quote")
+		return
+	}
+	amountIRR, _, err := iranianPaymentQuoteWithRate(req.AmountUSD, rate)
 	if err != nil || amountIRR < 10000 {
 		common.ApiErrorMsg(c, "invalid payment quote")
 		return
@@ -44,19 +92,36 @@ func requestIranianAmount(c *gin.Context) {
 	common.ApiSuccess(c, gin.H{
 		"amount_irr": amountIRR, "currency": "IRR",
 		"providers": enabledIranianProviders(), "default_provider": normalizedIranianDefault(),
+		"rate_source": rate.Source, "rate_updated_at": rate.UpdatedAt,
+		"rate_expires_at": rate.ExpiresAt, "rate_guard_enabled": rate.Guarded,
 	})
 }
 
 func iranianPaymentQuote(amountUSD int64) (amountIRR int64, creditedQuota int, err error) {
-	if amountUSD < int64(setting.ZarinpalMinTopUpUSD) || setting.ZarinpalIRRPerUSD <= 0 {
-		return 0, 0, fmt.Errorf("invalid top-up amount or exchange rate")
+	return iranianPaymentQuoteAt(amountUSD, time.Now())
+}
+
+func iranianPaymentQuoteAt(amountUSD int64, now time.Time) (amountIRR int64, creditedQuota int, err error) {
+	if amountUSD < int64(setting.ZarinpalMinTopUpUSD) {
+		return 0, 0, fmt.Errorf("invalid top-up amount")
 	}
-	if setting.ZarinpalMarginBPS < 0 || setting.ZarinpalMarginBPS > 10000 {
+	rate, err := currentIranianFXRateSnapshot(now)
+	if err != nil {
+		return 0, 0, err
+	}
+	return iranianPaymentQuoteWithRate(amountUSD, rate)
+}
+
+func iranianPaymentQuoteWithRate(amountUSD int64, rate iranianFXRateSnapshot) (amountIRR int64, creditedQuota int, err error) {
+	if amountUSD < int64(setting.ZarinpalMinTopUpUSD) {
+		return 0, 0, fmt.Errorf("invalid top-up amount")
+	}
+	if rate.MarginBPS < 0 || rate.MarginBPS > 10000 {
 		return 0, 0, fmt.Errorf("invalid pricing margin")
 	}
 	quoted := decimal.NewFromInt(amountUSD).
-		Mul(decimal.NewFromInt(setting.ZarinpalIRRPerUSD)).
-		Mul(decimal.NewFromInt(int64(10000 + setting.ZarinpalMarginBPS))).
+		Mul(decimal.NewFromInt(rate.Rate)).
+		Mul(decimal.NewFromInt(int64(10000 + rate.MarginBPS))).
 		Div(decimal.NewFromInt(10000)).Ceil()
 	if quoted.GreaterThan(decimal.NewFromInt(math.MaxInt64)) {
 		return 0, 0, model.ErrInvalidTopUpQuota
@@ -119,7 +184,11 @@ func iranianProviderOrder(requested string) ([]string, error) {
 }
 
 func createIranianPayment(c *gin.Context, amountUSD int64, provider string) (*iranianPaymentResult, bool, error) {
-	amountIRR, creditedQuota, err := iranianPaymentQuote(amountUSD)
+	rate, err := currentIranianFXRateSnapshot(time.Now())
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid payment quote")
+	}
+	amountIRR, creditedQuota, err := iranianPaymentQuoteWithRate(amountUSD, rate)
 	if err != nil || amountIRR < 10000 {
 		return nil, false, fmt.Errorf("invalid payment quote")
 	}
@@ -153,7 +222,8 @@ func createIranianPayment(c *gin.Context, amountUSD int64, provider string) (*ir
 		UserId: userID, Amount: amountUSD, Money: float64(amountIRR), TradeNo: provider + "_" + reference,
 		PaymentMethod: provider, PaymentProvider: provider, CreateTime: time.Now().Unix(), Status: common.TopUpStatusPending,
 		CreditedQuota: creditedQuota, PaidAmountMinor: amountIRR, Currency: "IRR",
-		ExchangeRate: setting.ZarinpalIRRPerUSD, PricingMarginBPS: setting.ZarinpalMarginBPS, ProviderReference: reference,
+		ExchangeRate: rate.Rate, ExchangeRateSource: rate.Source,
+		ExchangeRateUpdatedAt: rate.UpdatedAt, PricingMarginBPS: rate.MarginBPS, ProviderReference: reference,
 	}
 	if err := topUp.Insert(); err != nil {
 		// A remote identifier now exists. Switching providers could create two
