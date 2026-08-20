@@ -99,6 +99,10 @@ func InitOptionMap() {
 	common.OptionMap["IranianPaymentDefault"] = setting.IranianPaymentDefault
 	common.OptionMap["IranianPaymentAutoFailover"] = strconv.FormatBool(setting.IranianPaymentAutoFailover)
 	common.OptionMap["IranianPaymentExclusiveUI"] = strconv.FormatBool(setting.IranianPaymentExclusiveUI)
+	common.OptionMap["IranianFXRateGuardEnabled"] = strconv.FormatBool(setting.IranianFXRateGuardEnabled)
+	common.OptionMap["IranianFXRateSource"] = setting.IranianFXRateSource
+	common.OptionMap["IranianFXRateUpdatedAt"] = strconv.FormatInt(setting.IranianFXRateUpdatedAt, 10)
+	common.OptionMap["IranianFXRateMaxAgeSeconds"] = strconv.FormatInt(setting.IranianFXRateMaxAgeSeconds, 10)
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
@@ -241,6 +245,22 @@ func validateOptionValue(key string, value string) error {
 	case "IranianPaymentDefault":
 		if value != PaymentProviderZarinpal && value != PaymentProviderZibal {
 			return fmt.Errorf("IranianPaymentDefault must be zarinpal or zibal")
+		}
+	case "IranianFXRateGuardEnabled":
+		if value != "true" && value != "false" {
+			return fmt.Errorf("IranianFXRateGuardEnabled must be true or false")
+		}
+	case "IranianFXRateSource":
+		if strings.TrimSpace(value) == "" || len(value) > 64 {
+			return fmt.Errorf("IranianFXRateSource must be between 1 and 64 characters")
+		}
+	case "IranianFXRateUpdatedAt":
+		if parsed, err := strconv.ParseInt(value, 10, 64); err != nil || parsed < 0 {
+			return fmt.Errorf("IranianFXRateUpdatedAt must be a non-negative Unix timestamp")
+		}
+	case "IranianFXRateMaxAgeSeconds":
+		if parsed, err := strconv.ParseInt(value, 10, 64); err != nil || parsed <= 0 {
+			return fmt.Errorf("IranianFXRateMaxAgeSeconds must be a positive integer")
 		}
 	}
 	return nil
@@ -488,6 +508,14 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.IranianPaymentAutoFailover = value == "true"
 	case "IranianPaymentExclusiveUI":
 		setting.IranianPaymentExclusiveUI = value == "true"
+	case "IranianFXRateGuardEnabled":
+		setting.IranianFXRateGuardEnabled = value == "true"
+	case "IranianFXRateSource":
+		setting.IranianFXRateSource = strings.TrimSpace(value)
+	case "IranianFXRateUpdatedAt":
+		setting.IranianFXRateUpdatedAt, _ = strconv.ParseInt(value, 10, 64)
+	case "IranianFXRateMaxAgeSeconds":
+		setting.IranianFXRateMaxAgeSeconds, _ = strconv.ParseInt(value, 10, 64)
 	case "StripeMinTopUp":
 		setting.StripeMinTopUp, _ = strconv.Atoi(value)
 	case "StripePromotionCodesEnabled":

@@ -10,4 +10,8 @@ var (
 	IranianPaymentDefault            = "zarinpal"
 	IranianPaymentAutoFailover       = true
 	IranianPaymentExclusiveUI         = false
+	IranianFXRateGuardEnabled          = false
+	IranianFXRateSource                = "manual"
+	IranianFXRateUpdatedAt       int64 = 0
+	IranianFXRateMaxAgeSeconds   int64 = 900
 )
