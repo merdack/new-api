@@ -25,14 +25,17 @@ import (
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
 
-	// 获取支付方式
-	payMethods := operation_setting.PayMethods
-	if !complianceConfirmed {
+	// Copy the configured methods so response-only filtering/appends never mutate
+	// the global option slice. Iranian-only mode hides unrelated gateways in the
+	// wallet while leaving their endpoints and configuration untouched.
+	showNonIranianPayments := !setting.IranianPaymentExclusiveUI
+	payMethods := append([]map[string]string(nil), operation_setting.PayMethods...)
+	if !complianceConfirmed || !showNonIranianPayments {
 		payMethods = []map[string]string{}
 	}
 
 	// 如果启用了 Stripe 支付，添加到支付方法列表
-	if isStripeTopUpEnabled() {
+	if showNonIranianPayments && isStripeTopUpEnabled() {
 		// 检查是否已经包含 Stripe
 		hasStripe := false
 		for _, method := range payMethods {
@@ -54,7 +57,7 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	// Waffo Pancake is displayed above the standard Waffo gateway.
-	enableWaffoPancake := isWaffoPancakeTopUpEnabled()
+	enableWaffoPancake := showNonIranianPayments && isWaffoPancakeTopUpEnabled()
 	if enableWaffoPancake {
 		hasWaffoPancake := false
 		for _, method := range payMethods {
@@ -75,7 +78,7 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	// 如果启用了 Waffo 支付，添加到支付方法列表
-	enableWaffo := isWaffoTopUpEnabled()
+	enableWaffo := showNonIranianPayments && isWaffoTopUpEnabled()
 	if enableWaffo {
 		hasWaffo := false
 		for _, method := range payMethods {
@@ -97,9 +100,15 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	data := gin.H{
-		"enable_online_topup":              isEpayTopUpEnabled(),
-		"enable_stripe_topup":              isStripeTopUpEnabled(),
-		"enable_creem_topup":               isCreemTopUpEnabled(),
+		"enable_online_topup":              showNonIranianPayments && isEpayTopUpEnabled(),
+		"enable_stripe_topup":              showNonIranianPayments && isStripeTopUpEnabled(),
+		"enable_zarinpal_topup":            isZarinpalTopUpEnabled(),
+		"enable_zibal_topup":               isZibalTopUpEnabled(),
+		"zarinpal_min_topup_usd":           setting.ZarinpalMinTopUpUSD,
+		"iranian_payment_default":          normalizedIranianDefault(),
+		"iranian_payment_auto_failover":    setting.IranianPaymentAutoFailover,
+		"iranian_payment_exclusive_ui":      setting.IranianPaymentExclusiveUI,
+		"enable_creem_topup":               showNonIranianPayments && isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
 		"enable_redemption":                complianceConfirmed,

@@ -39,6 +39,9 @@ import type {
   WaffoPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
+  IranianPaymentRequest,
+  IranianPaymentResponse,
+  IranianAmountResponse,
 } from './types'
 
 // ============================================================================
@@ -94,6 +97,15 @@ export async function calculateStripeAmount(
   return res.data
 }
 
+export async function calculateIranianAmount(
+  request: IranianPaymentRequest
+): Promise<IranianAmountResponse> {
+  const res = await api.post('/api/user/iranian/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
 /**
  * Calculate payment amount for Waffo payment
  */
@@ -128,6 +140,15 @@ export async function requestStripePayment(
   request: PaymentRequest
 ): Promise<StripePaymentResponse> {
   const res = await api.post('/api/user/stripe/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestIranianPayment(
+  request: IranianPaymentRequest
+): Promise<IranianPaymentResponse> {
+  const res = await api.post('/api/user/iranian/pay', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data

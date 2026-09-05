@@ -39,6 +39,19 @@ export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
 }
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
+export type IranianPaymentProvider = 'zarinpal' | 'zibal'
+export type IranianPaymentResponse = ApiResponse<{
+  provider: IranianPaymentProvider
+  pay_link: string
+  amount_irr: number
+  currency: 'IRR'
+}>
+export type IranianAmountResponse = ApiResponse<{
+  amount_irr: number
+  currency: 'IRR'
+  providers: IranianPaymentProvider[]
+  default_provider: IranianPaymentProvider
+}>
 export type AffiliateCodeResponse = ApiResponse<string>
 export type AffiliateTransferResponse = ApiResponse
 export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
@@ -124,6 +137,18 @@ export interface TopupInfo {
   enable_online_topup: boolean
   /** Whether Stripe topup is enabled */
   enable_stripe_topup: boolean
+  /** Whether Zarinpal topup is enabled */
+  enable_zarinpal_topup?: boolean
+  /** Whether Zibal topup is enabled */
+  enable_zibal_topup?: boolean
+  /** Minimum whole-dollar Iranian gateway topup */
+  zarinpal_min_topup_usd?: number
+  /** Default Iranian payment provider */
+  iranian_payment_default?: IranianPaymentProvider
+  /** Whether provider-neutral checkout may fail over */
+  iranian_payment_auto_failover?: boolean
+  /** Whether the wallet hides non-Iranian payment methods */
+  iranian_payment_exclusive_ui?: boolean
   /** Available payment methods */
   pay_methods: PaymentMethod[]
   /** Minimum topup amount for online topup */
@@ -210,6 +235,11 @@ export interface WaffoPancakePaymentRequest {
 export interface AmountRequest {
   /** Topup amount to calculate */
   amount: number
+}
+
+export interface IranianPaymentRequest {
+  amount_usd: number
+  provider?: IranianPaymentProvider
 }
 
 /**

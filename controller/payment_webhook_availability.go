@@ -20,6 +20,27 @@ func isStripeTopUpEnabled() bool {
 		strings.TrimSpace(setting.StripePriceId) != ""
 }
 
+func isZarinpalTopUpEnabled() bool {
+	return isPaymentComplianceConfirmed() && strings.TrimSpace(setting.ZarinpalMerchantID) != "" &&
+		setting.ZarinpalIRRPerUSD > 0 && setting.ZarinpalMarginBPS >= 0 && setting.ZarinpalMarginBPS <= 10000
+}
+
+func isZibalTopUpEnabled() bool {
+	return isPaymentComplianceConfirmed() && strings.TrimSpace(setting.ZibalMerchant) != "" &&
+		setting.ZarinpalIRRPerUSD > 0 && setting.ZarinpalMarginBPS >= 0 && setting.ZarinpalMarginBPS <= 10000
+}
+
+func isIranianGatewayEnabled(provider string) bool {
+	switch provider {
+	case "zarinpal":
+		return isZarinpalTopUpEnabled()
+	case "zibal":
+		return isZibalTopUpEnabled()
+	default:
+		return false
+	}
+}
+
 func isStripeWebhookConfigured() bool {
 	return strings.TrimSpace(setting.StripeWebhookSecret) != ""
 }

@@ -44,6 +44,28 @@ func TestStripeWebhookEnabledRequiresTopUpAndWebhookConfig(t *testing.T) {
 	require.False(t, isStripeWebhookEnabled())
 }
 
+func TestZibalTopUpEnabledRequiresMerchantRateAndCompliance(t *testing.T) {
+	confirmPaymentComplianceForTest(t)
+	originalMerchant := setting.ZibalMerchant
+	originalRate := setting.ZarinpalIRRPerUSD
+	originalMargin := setting.ZarinpalMarginBPS
+	t.Cleanup(func() {
+		setting.ZibalMerchant = originalMerchant
+		setting.ZarinpalIRRPerUSD = originalRate
+		setting.ZarinpalMarginBPS = originalMargin
+	})
+	setting.ZibalMerchant = "zibal"
+	setting.ZarinpalIRRPerUSD = 1_000_000
+	setting.ZarinpalMarginBPS = 1000
+	require.True(t, isZibalTopUpEnabled())
+
+	setting.ZibalMerchant = ""
+	require.False(t, isZibalTopUpEnabled())
+	setting.ZibalMerchant = "zibal"
+	setting.ZarinpalIRRPerUSD = 0
+	require.False(t, isZibalTopUpEnabled())
+}
+
 func TestCreemWebhookEnabledRequiresTopUpAndWebhookConfig(t *testing.T) {
 	confirmPaymentComplianceForTest(t)
 	originalAPIKey := setting.CreemApiKey

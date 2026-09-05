@@ -93,6 +93,49 @@ export function isWaffoPancakePayment(paymentType: string): boolean {
   return paymentType === PAYMENT_TYPES.WAFFO_PANCAKE
 }
 
+export function isIranianPayment(paymentType: string): boolean {
+  return (
+    paymentType === PAYMENT_TYPES.IRANIAN_AUTO ||
+    paymentType === PAYMENT_TYPES.ZARINPAL ||
+    paymentType === PAYMENT_TYPES.ZIBAL
+  )
+}
+
+export function getIranianPaymentMethods(
+  topupInfo: TopupInfo | null
+): PaymentMethod[] {
+  if (!topupInfo) return []
+
+  const methods: PaymentMethod[] = []
+  const minTopup = topupInfo.zarinpal_min_topup_usd
+  if (
+    topupInfo.iranian_payment_auto_failover &&
+    topupInfo.enable_zarinpal_topup &&
+    topupInfo.enable_zibal_topup
+  ) {
+    methods.push({
+      name: 'Automatic gateway selection',
+      type: PAYMENT_TYPES.IRANIAN_AUTO,
+      min_topup: minTopup,
+    })
+  }
+  if (topupInfo.enable_zarinpal_topup) {
+    methods.push({
+      name: 'Zarinpal',
+      type: PAYMENT_TYPES.ZARINPAL,
+      min_topup: minTopup,
+    })
+  }
+  if (topupInfo.enable_zibal_topup) {
+    methods.push({
+      name: 'Zibal',
+      type: PAYMENT_TYPES.ZIBAL,
+      min_topup: minTopup,
+    })
+  }
+  return methods
+}
+
 export interface PaymentProcessors {
   regular: (topupAmount: number, paymentType: string) => Promise<boolean>
   waffo: (topupAmount: number, payMethodIndex: number) => Promise<boolean>
@@ -132,6 +175,12 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
     return topupInfo.pay_methods[0].type
   }
 
+  if (topupInfo.enable_zarinpal_topup || topupInfo.enable_zibal_topup) {
+    return topupInfo.iranian_payment_auto_failover
+      ? PAYMENT_TYPES.IRANIAN_AUTO
+      : topupInfo.iranian_payment_default || PAYMENT_TYPES.ZARINPAL
+  }
+
   if (topupInfo.enable_stripe_topup) {
     return PAYMENT_TYPES.STRIPE
   }
@@ -157,6 +206,10 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
 
   if (topupInfo.enable_online_topup) {
     return topupInfo.min_topup
+  }
+
+  if (topupInfo.enable_zarinpal_topup || topupInfo.enable_zibal_topup) {
+    return topupInfo.zarinpal_min_topup_usd || DEFAULT_MIN_TOPUP
   }
 
   if (topupInfo.enable_stripe_topup) {

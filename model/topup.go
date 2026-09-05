@@ -12,16 +12,23 @@ import (
 )
 
 type TopUp struct {
-	Id              int     `json:"id"`
-	UserId          int     `json:"user_id" gorm:"index"`
-	Amount          int64   `json:"amount"`
-	Money           float64 `json:"money"`
-	TradeNo         string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
-	PaymentMethod   string  `json:"payment_method" gorm:"type:varchar(50)"`
-	PaymentProvider string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
-	CreateTime      int64   `json:"create_time"`
-	CompleteTime    int64   `json:"complete_time"`
-	Status          string  `json:"status"`
+	Id                int     `json:"id"`
+	UserId            int     `json:"user_id" gorm:"index"`
+	Amount            int64   `json:"amount"`
+	Money             float64 `json:"money"`
+	TradeNo           string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
+	PaymentMethod     string  `json:"payment_method" gorm:"type:varchar(50)"`
+	PaymentProvider   string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
+	CreateTime        int64   `json:"create_time"`
+	CompleteTime      int64   `json:"complete_time"`
+	Status            string  `json:"status"`
+	CreditedQuota     int     `json:"credited_quota"`
+	PaidAmountMinor   int64   `json:"paid_amount_minor"`
+	Currency          string  `json:"currency" gorm:"type:varchar(8);default:''"`
+	ExchangeRate      int64   `json:"exchange_rate"`
+	PricingMarginBPS  int     `json:"pricing_margin_bps"`
+	ProviderReference string  `json:"provider_reference" gorm:"type:varchar(255);index"`
+	ProviderReceipt   string  `json:"provider_receipt" gorm:"type:varchar(255);default:''"`
 }
 
 const (
@@ -30,6 +37,8 @@ const (
 	PaymentMethodWaffo        = "waffo"
 	PaymentMethodWaffoPancake = "waffo_pancake"
 	PaymentMethodBalance      = "balance"
+	PaymentMethodZarinpal     = "zarinpal"
+	PaymentMethodZibal        = "zibal"
 )
 
 const (
@@ -39,7 +48,56 @@ const (
 	PaymentProviderWaffo        = "waffo"
 	PaymentProviderWaffoPancake = "waffo_pancake"
 	PaymentProviderBalance      = "balance"
+	PaymentProviderZarinpal     = "zarinpal"
+	PaymentProviderZibal        = "zibal"
 )
+
+func GetTopUpByProviderReference(provider, reference string) *TopUp {
+	if provider == "" || reference == "" {
+		return nil
+	}
+	var topUp TopUp
+	if err := DB.Where("payment_provider = ? AND provider_reference = ?", provider, reference).First(&topUp).Error; err != nil {
+		return nil
+	}
+	return &topUp
+}
+
+// RechargeIranianTopUp credits the immutable quota captured when the IRR quote was
+// created. It never recalculates using the current exchange rate.
+func RechargeIranianTopUp(provider, reference, receipt, callerIP string) (alreadyDone bool, err error) {
+	if reference == "" || (provider != PaymentProviderZarinpal && provider != PaymentProviderZibal) {
+		return false, ErrTopUpNotFound
+	}
+	var topUp TopUp
+	var quotaToAdd int
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockForUpdate(tx).Where("payment_provider = ? AND provider_reference = ?", provider, reference).First(&topUp).Error; err != nil {
+			return ErrTopUpNotFound
+		}
+		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
+			return nil
+		}
+		if topUp.Status != common.TopUpStatusPending || topUp.CreditedQuota <= 0 {
+			return ErrTopUpStatusInvalid
+		}
+		quotaToAdd = topUp.CreditedQuota
+		topUp.Status = common.TopUpStatusSuccess
+		topUp.CompleteTime = common.GetTimestamp()
+		topUp.ProviderReceipt = receipt
+		if err := tx.Save(&topUp).Error; err != nil {
+			return err
+		}
+		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+	})
+	if err != nil || alreadyDone {
+		return alreadyDone, err
+	}
+	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, provider+" topup")
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("Iranian gateway top-up credited: %v", logger.LogQuota(quotaToAdd)), callerIP, provider, provider)
+	return false, nil
+}
 
 var (
 	ErrPaymentMethodMismatch    = errors.New("payment method mismatch")
